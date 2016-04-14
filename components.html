@@ -1,0 +1,133 @@
+---
+layout: default
+---
+<h1>Hello!</h1>
+
+<analytics-bars format="%" data='[{"key": "IE", "value": 100},{"key": "Chrome", "value": 50}]'></analytics-bars>
+
+<analytics-bars data='[{"key": "OSX", "value": 10000},{"key": "Windows", "value": 50000}]'></analytics-bars>
+<script src="{{ site.baseurl }}/js/vendor/document-register-element.min.js"></script>
+<script src="{{ site.baseurl }}/js/vendor/x-tag-no-polyfills.min.js"></script>
+<script>
+
+var formatPercent = function(p) {
+  return p >= .1
+    ? p.toFixed(1) + '%'
+    : '< 0.1%';
+};
+
+xtag.register('analytics-bar', {
+  content: [
+    '<span class="label"></span>',
+    '<span class="value"></span>',
+    '<div class="bar"></span>'
+  ].join(''),
+
+  lifecycle: {
+    created: function() {
+      this.__value = 0;
+      this.__max = 100;
+      this.xtag.label = this.querySelector('.label');
+      this.xtag.value = this.querySelector('.value');
+      this.xtag.bar = this.querySelector('.bar');
+      this.format = this.getAttribute('format');
+    }
+  },
+
+  methods: {
+    update: function() {
+      var size = 100 * this.value / this.max;
+      this.xtag.value.innerText = this.__format(this.value);
+      this.xtag.bar.style.setProperty('width', size + '%');
+    },
+  },
+
+  accessors: {
+    label: {
+      get: function() {
+        return this.xtag.label.innerText;
+      },
+      set: function(value) {
+        this.xtag.label.innerText = value;
+      }
+    },
+    value: {
+      get: function() {
+        return this.__value;
+      },
+      set: function(value) {
+        if (this.__value !== value) {
+          this.__value = value;
+          this.update();
+        }
+      }
+    },
+    format: {
+      get: function() {
+        return this.__format;
+      },
+      set: function(format) {
+        if (this.__format !== format) {
+          this.__format = format === '%'
+            ? formatPercent
+            : d3.format(format || ',');
+          this.update();
+        }
+      }
+    }
+  }
+});
+
+xtag.register('analytics-bars', {
+  lifecycle: {
+    created: function() {
+      if (this.hasAttribute('data')) {
+        this.data = JSON.parse(this.getAttribute('data'));
+      }
+      if (this.hasAttribute('data-url')) {
+        this.load(this.getAttribute('data-url'));
+      }
+    }
+  },
+
+  methods: {
+    load: function(url) {
+      var self = this;
+      d3.json(url, function(error, data) {
+        if (error) {
+          console.error('no data:', url, error);
+          return;
+        }
+        self.data = data;
+      });
+    },
+
+    update: function() {
+      var data = this.__data;
+      var max = d3.max(data, function(d) { return d.value; });
+      var bars = d3.select(this)
+        .selectAll('analytics-bar')
+          .data(data, function(d) { return d.key; });
+      bars.exit().remove();
+      bars.enter().append('analytics-bar');
+      bars
+        .property('format', this.getAttribute('format'))
+        .property('label', function(d) { return d.key; })
+        .property('max', max)
+        .property('value', function(d) { return d.value; });
+    }
+  },
+
+  accessors: {
+    data: {
+      get: function() {
+        return this.__data;
+      },
+      set: function(data) {
+        this.__data = data;
+        this.update();
+      }
+    }
+  }
+});
+</script>
